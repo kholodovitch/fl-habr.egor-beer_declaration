@@ -102,62 +102,37 @@ public class Endpoint extends HandlerJSON {
     }
 
     public ResponseEntity<String> doPost(InputStreamReader is, String clazz) throws IOException, SQLException {
-        List<Table> resultList;
         String result = "done";
 
         switch (clazz) {
             case "nomenclature":
                 System.out.println("find header: nomenclature");
-                resultList = objectMapper.readValue(new BufferedReader(is)
-                        .lines()
-                        .collect(Collectors.joining("\n")), new TypeReference<List<Nomenklature>>() {
-                });
-                declarationService.sendNomenclature(resultList);
+                declarationService.sendNomenclature(getParsedList(is, Nomenklature.class));
                 break;
 
             case "storage":
                 System.out.println("find header: storage");
-                resultList = objectMapper.readValue(new BufferedReader(is)
-                        .lines()
-                        .collect(Collectors.joining("\n")), new TypeReference<List<Storage>>() {
-                });
-                declarationService.sendStorage(resultList);
+                declarationService.sendStorage(getParsedList(is, Storage.class));
                 break;
 
             case "suppliers":
                 System.out.println("find header: suppliers");
-                resultList = objectMapper.readValue(new BufferedReader(is)
-                        .lines()
-                        .collect(Collectors.joining("\n")), new TypeReference<List<Suppliers>>() {
-                });
-                declarationService.sendSuppliers(resultList);
+                declarationService.sendSuppliers(getParsedList(is, Suppliers.class));
                 break;
 
             case "receipts":
                 System.out.println("find header: receipts");
-                resultList = objectMapper.readValue(new BufferedReader(is)
-                        .lines()
-                        .collect(Collectors.joining("\n")), new TypeReference<List<Receipts>>() {
-                });
-                declarationService.sendReceipts(resultList);
+                declarationService.sendReceipts(getParsedList(is, Receipts.class));
                 break;
 
             case "ostatki":
                 System.out.println("find header: ostatki");
-                resultList = objectMapper.readValue(new BufferedReader(is)
-                        .lines()
-                        .collect(Collectors.joining("\n")), new TypeReference<List<Ostatki>>() {
-                });
-                declarationService.sendOstatki(resultList);
+                declarationService.sendOstatki(getParsedList(is, Ostatki.class));
                 break;
 
             case "sales":  //--------------------
                 System.out.println("find header: sales");
-                resultList = objectMapper.readValue(new BufferedReader(is)
-                        .lines()
-                        .collect(Collectors.joining("\n")), new TypeReference<List<Sales>>() {
-                });
-                declarationService.sendSales(resultList);
+                declarationService.sendSales(getParsedList(is, Sales.class));
                 break;
 
             default:
@@ -169,6 +144,12 @@ public class Endpoint extends HandlerJSON {
         SQLConnectService.connectionClose();
         System.out.println(result);
         return new ResponseEntity<>(result, getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.OK);
+    }
+
+    private <T extends Table> List<T> getParsedList(InputStreamReader is, Class<T> type) throws IOException {
+        return objectMapper.readValue(new BufferedReader(is)
+                .lines()
+                .collect(Collectors.joining("\n")), new TypeReference<List<T>>(){});
     }
 
 }
