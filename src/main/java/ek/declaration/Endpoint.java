@@ -2,6 +2,7 @@ package ek.declaration;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import ek.declaration.handler.HandlerJSON;
 import ek.declaration.model.*;
@@ -10,6 +11,7 @@ import ek.declaration.services.SQLConnectService;
 
 import java.io.*;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -26,53 +28,53 @@ public class Endpoint extends HandlerJSON {
     HttpServer server;
     ObjectMapper objectMapper;
     DeclarationService declarationService;
-    public static ResponseEntity responseEntity = null;
-
+    public static ResponseEntity<String> responseEntity = null;
 
     public Endpoint(HttpServer server) {
         this.server = server;
         this.objectMapper = new ObjectMapper();
     }
 
-    public void createServerContext(){
+    public void createServerContext() {
         System.out.println("Declareate Beer Service Start");
         server.createContext("/api/beer_decalration", (exchange -> {
-                // проверка на POST
-                if ("POST".equals(exchange.getRequestMethod())) {
-                byte[] response;
-
-                    String method = exchange.getRequestHeaders().get("method").get(0);
-                    String user = exchange.getRequestHeaders().get("user").get(0);
-                    String pass = exchange.getRequestHeaders().get("pass").get(0);
-                    String url = exchange.getRequestHeaders().get("url").get(0);
-                    String database = exchange.getRequestHeaders().get("database").get(0);
-//                    String debug = exchange.getRequestHeaders().get("debug").get(0);
-
-                try {
-                    Statement statement = SQLConnectService.getConnect(user,pass,url,database);
-                    declarationService = new DeclarationService(statement);
-                    System.out.println("doPost starting");
-                    responseEntity = doPost(new InputStreamReader(exchange.getRequestBody(),"utf-8"), method);
-
-
-                } catch (SQLException e) {
-                    responseEntity = new ResponseEntity<>("SQLException",
-                            getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
-                    throw new RuntimeException(e);
-                }
-
-                OutputStream os = exchange.getResponseBody();
-
-                exchange.getResponseHeaders().putAll(responseEntity.getHeaders());
-                exchange.sendResponseHeaders(responseEntity.getStatusCode().getCode(), 0);
-                response = super.writeResponse(responseEntity.getBody());
-                os.write(response);
-                os.flush();
-                os.close();
-
-            } else {
+            // проверка на POST
+            if (!"POST".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(405, -1);// 405 Method Not Allowed
+                exchange.close();
+                return;
             }
+
+            byte[] response;
+            Headers requestHeaders = exchange.getRequestHeaders();
+            String method = requestHeaders.get("method").get(0);
+            String user = requestHeaders.get("user").get(0);
+            String pass = requestHeaders.get("pass").get(0);
+            String url = requestHeaders.get("url").get(0);
+            String database = requestHeaders.get("database").get(0);
+//          String debug = exchange.getRequestHeaders().get("debug").get(0);
+
+            try {
+                Statement statement = SQLConnectService.getConnect(user, pass, url, database);
+                declarationService = new DeclarationService(statement);
+                System.out.println("doPost starting");
+                try (InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {
+                    responseEntity = doPost(reader, method);
+                }
+            } catch (SQLException e) {
+                responseEntity = new ResponseEntity<>("SQLException",
+                        getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
+                throw new RuntimeException(e);
+            }
+
+            OutputStream os = exchange.getResponseBody();
+
+            exchange.getResponseHeaders().putAll(responseEntity.getHeaders());
+            exchange.sendResponseHeaders(responseEntity.getStatusCode().getCode(), 0);
+            response = super.writeResponse(responseEntity.getBody());
+            os.write(response);
+            os.flush();
+            os.close();
             exchange.close();
         }));
         server.setExecutor(null); // creates a default executor
@@ -81,7 +83,7 @@ public class Endpoint extends HandlerJSON {
 
 
     public static Map<String, List<String>> splitQuery(String query) {
-        if (query == null || "".equals(query)) {
+        if (query == null || query.isEmpty()) {
             return Collections.emptyMap();
         }
 
@@ -100,65 +102,54 @@ public class Endpoint extends HandlerJSON {
     }
 
     public ResponseEntity<String> doPost(InputStreamReader is, String clazz) throws IOException, SQLException {
-
-        List<Table> resultList;
         String result = "done";
 
-        if (clazz.equals("nomenclature")) {
-            System.out.println("find header: nomenclature");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Nomenklature>>(){});
-            declarationService.sendNomenclature(resultList);
+        switch (clazz) {
+            case "nomenclature":
+                System.out.println("find header: nomenclature");
+                declarationService.sendNomenclature(getParsedList(is, Nomenklature.class));
+                break;
 
-        } else if (clazz.equals("storage")) {
-            System.out.println("find header: storage");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Storage>>(){});
-            declarationService.sendStorage(resultList);
+            case "storage":
+                System.out.println("find header: storage");
+                declarationService.sendStorage(getParsedList(is, Storage.class));
+                break;
 
-        } else if (clazz.equals("suppliers")) {
-            System.out.println("find header: suppliers");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Suppliers>>(){});
-            declarationService.sendSuppliers(resultList);
+            case "suppliers":
+                System.out.println("find header: suppliers");
+                declarationService.sendSuppliers(getParsedList(is, Suppliers.class));
+                break;
 
-        } else if (clazz.equals("receipts")) {
-            System.out.println("find header: receipts");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Receipts>>(){});
-            declarationService.sendReceipts(resultList);
+            case "receipts":
+                System.out.println("find header: receipts");
+                declarationService.sendReceipts(getParsedList(is, Receipts.class));
+                break;
 
-        } else if (clazz.equals("ostatki")) {
-            System.out.println("find header: ostatki");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Ostatki>>(){});
-            declarationService.sendOstatki(resultList);
+            case "ostatki":
+                System.out.println("find header: ostatki");
+                declarationService.sendOstatki(getParsedList(is, Ostatki.class));
+                break;
 
-        } else if (clazz.equals("sales")) { //--------------------
-            System.out.println("find header: sales");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Sales>>(){});
-            declarationService.sendSales(resultList);
+            case "sales":  //--------------------
+                System.out.println("find header: sales");
+                declarationService.sendSales(getParsedList(is, Sales.class));
+                break;
 
-
-
-        } else {
-            System.out.println("not found header :(");
-            return new ResponseEntity<>("404 NOT FOUND",
-                    getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
+            default:
+                System.out.println("not found header :(");
+                return new ResponseEntity<>("404 NOT FOUND",
+                        getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
         }
-
 
         SQLConnectService.connectionClose();
         System.out.println(result);
-        return new ResponseEntity<>(result,
-                getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.OK);
+        return new ResponseEntity<>(result, getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.OK);
+    }
+
+    private <T extends Table> List<T> getParsedList(InputStreamReader is, Class<T> type) throws IOException {
+        return objectMapper.readValue(new BufferedReader(is)
+                .lines()
+                .collect(Collectors.joining("\n")), new TypeReference<List<T>>(){});
     }
 
 }
