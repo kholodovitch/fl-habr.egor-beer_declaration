@@ -11,6 +11,7 @@ import ek.declaration.services.SQLConnectService;
 
 import java.io.*;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -27,7 +28,7 @@ public class Endpoint extends HandlerJSON {
     HttpServer server;
     ObjectMapper objectMapper;
     DeclarationService declarationService;
-    public static ResponseEntity responseEntity = null;
+    public static ResponseEntity<String> responseEntity = null;
 
     public Endpoint(HttpServer server) {
         this.server = server;
@@ -57,7 +58,9 @@ public class Endpoint extends HandlerJSON {
                 Statement statement = SQLConnectService.getConnect(user, pass, url, database);
                 declarationService = new DeclarationService(statement);
                 System.out.println("doPost starting");
-                responseEntity = doPost(new InputStreamReader(exchange.getRequestBody(), "utf-8"), method);
+                try (InputStreamReader reader = new InputStreamReader(exchange.getRequestBody(), StandardCharsets.UTF_8)) {
+                    responseEntity = doPost(reader, method);
+                }
             } catch (SQLException e) {
                 responseEntity = new ResponseEntity<>("SQLException",
                         getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
@@ -80,7 +83,7 @@ public class Endpoint extends HandlerJSON {
 
 
     public static Map<String, List<String>> splitQuery(String query) {
-        if (query == null || "".equals(query)) {
+        if (query == null || query.isEmpty()) {
             return Collections.emptyMap();
         }
 
@@ -99,66 +102,73 @@ public class Endpoint extends HandlerJSON {
     }
 
     public ResponseEntity<String> doPost(InputStreamReader is, String clazz) throws IOException, SQLException {
-
         List<Table> resultList;
         String result = "done";
 
-        if (clazz.equals("nomenclature")) {
-            System.out.println("find header: nomenclature");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Nomenklature>>() {
-            });
-            declarationService.sendNomenclature(resultList);
+        switch (clazz) {
+            case "nomenclature":
+                System.out.println("find header: nomenclature");
+                resultList = objectMapper.readValue(new BufferedReader(is)
+                        .lines()
+                        .collect(Collectors.joining("\n")), new TypeReference<List<Nomenklature>>() {
+                });
+                declarationService.sendNomenclature(resultList);
+                break;
 
-        } else if (clazz.equals("storage")) {
-            System.out.println("find header: storage");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Storage>>() {
-            });
-            declarationService.sendStorage(resultList);
+            case "storage":
+                System.out.println("find header: storage");
+                resultList = objectMapper.readValue(new BufferedReader(is)
+                        .lines()
+                        .collect(Collectors.joining("\n")), new TypeReference<List<Storage>>() {
+                });
+                declarationService.sendStorage(resultList);
+                break;
 
-        } else if (clazz.equals("suppliers")) {
-            System.out.println("find header: suppliers");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Suppliers>>() {
-            });
-            declarationService.sendSuppliers(resultList);
+            case "suppliers":
+                System.out.println("find header: suppliers");
+                resultList = objectMapper.readValue(new BufferedReader(is)
+                        .lines()
+                        .collect(Collectors.joining("\n")), new TypeReference<List<Suppliers>>() {
+                });
+                declarationService.sendSuppliers(resultList);
+                break;
 
-        } else if (clazz.equals("receipts")) {
-            System.out.println("find header: receipts");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Receipts>>() {
-            });
-            declarationService.sendReceipts(resultList);
+            case "receipts":
+                System.out.println("find header: receipts");
+                resultList = objectMapper.readValue(new BufferedReader(is)
+                        .lines()
+                        .collect(Collectors.joining("\n")), new TypeReference<List<Receipts>>() {
+                });
+                declarationService.sendReceipts(resultList);
+                break;
 
-        } else if (clazz.equals("ostatki")) {
-            System.out.println("find header: ostatki");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Ostatki>>() {
-            });
-            declarationService.sendOstatki(resultList);
-        } else if (clazz.equals("sales")) { //--------------------
-            System.out.println("find header: sales");
-            resultList = objectMapper.readValue(new BufferedReader(is)
-                    .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Sales>>() {
-            });
-            declarationService.sendSales(resultList);
-        } else {
-            System.out.println("not found header :(");
-            return new ResponseEntity<>("404 NOT FOUND",
-                    getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
+            case "ostatki":
+                System.out.println("find header: ostatki");
+                resultList = objectMapper.readValue(new BufferedReader(is)
+                        .lines()
+                        .collect(Collectors.joining("\n")), new TypeReference<List<Ostatki>>() {
+                });
+                declarationService.sendOstatki(resultList);
+                break;
+
+            case "sales":  //--------------------
+                System.out.println("find header: sales");
+                resultList = objectMapper.readValue(new BufferedReader(is)
+                        .lines()
+                        .collect(Collectors.joining("\n")), new TypeReference<List<Sales>>() {
+                });
+                declarationService.sendSales(resultList);
+                break;
+
+            default:
+                System.out.println("not found header :(");
+                return new ResponseEntity<>("404 NOT FOUND",
+                        getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
         }
 
         SQLConnectService.connectionClose();
         System.out.println(result);
-        return new ResponseEntity<>(result,
-                getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.OK);
+        return new ResponseEntity<>(result, getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.OK);
     }
 
 }
