@@ -28,31 +28,30 @@ public class Endpoint extends HandlerJSON {
     DeclarationService declarationService;
     public static ResponseEntity responseEntity = null;
 
-
     public Endpoint(HttpServer server) {
         this.server = server;
         this.objectMapper = new ObjectMapper();
     }
 
-    public void createServerContext(){
+    public void createServerContext() {
         System.out.println("Declareate Beer Service Start");
         server.createContext("/api/beer_decalration", (exchange -> {
-                // проверка на POST
-                if ("POST".equals(exchange.getRequestMethod())) {
+            // проверка на POST
+            if ("POST".equals(exchange.getRequestMethod())) {
                 byte[] response;
 
-                    String method = exchange.getRequestHeaders().get("method").get(0);
-                    String user = exchange.getRequestHeaders().get("user").get(0);
-                    String pass = exchange.getRequestHeaders().get("pass").get(0);
-                    String url = exchange.getRequestHeaders().get("url").get(0);
-                    String database = exchange.getRequestHeaders().get("database").get(0);
-//                    String debug = exchange.getRequestHeaders().get("debug").get(0);
+                String method = exchange.getRequestHeaders().get("method").get(0);
+                String user = exchange.getRequestHeaders().get("user").get(0);
+                String pass = exchange.getRequestHeaders().get("pass").get(0);
+                String url = exchange.getRequestHeaders().get("url").get(0);
+                String database = exchange.getRequestHeaders().get("database").get(0);
+//              String debug = exchange.getRequestHeaders().get("debug").get(0);
 
                 try {
-                    Statement statement = SQLConnectService.getConnect(user,pass,url,database);
+                    Statement statement = SQLConnectService.getConnect(user, pass, url, database);
                     declarationService = new DeclarationService(statement);
                     System.out.println("doPost starting");
-                    responseEntity = doPost(new InputStreamReader(exchange.getRequestBody(),"utf-8"), method);
+                    responseEntity = doPost(new InputStreamReader(exchange.getRequestBody(), "utf-8"), method);
 
 
                 } catch (SQLException e) {
@@ -108,52 +107,53 @@ public class Endpoint extends HandlerJSON {
             System.out.println("find header: nomenclature");
             resultList = objectMapper.readValue(new BufferedReader(is)
                     .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Nomenklature>>(){});
+                    .collect(Collectors.joining("\n")), new TypeReference<List<Nomenklature>>() {
+            });
             declarationService.sendNomenclature(resultList);
 
         } else if (clazz.equals("storage")) {
             System.out.println("find header: storage");
             resultList = objectMapper.readValue(new BufferedReader(is)
                     .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Storage>>(){});
+                    .collect(Collectors.joining("\n")), new TypeReference<List<Storage>>() {
+            });
             declarationService.sendStorage(resultList);
 
         } else if (clazz.equals("suppliers")) {
             System.out.println("find header: suppliers");
             resultList = objectMapper.readValue(new BufferedReader(is)
                     .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Suppliers>>(){});
+                    .collect(Collectors.joining("\n")), new TypeReference<List<Suppliers>>() {
+            });
             declarationService.sendSuppliers(resultList);
 
         } else if (clazz.equals("receipts")) {
             System.out.println("find header: receipts");
             resultList = objectMapper.readValue(new BufferedReader(is)
                     .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Receipts>>(){});
+                    .collect(Collectors.joining("\n")), new TypeReference<List<Receipts>>() {
+            });
             declarationService.sendReceipts(resultList);
 
         } else if (clazz.equals("ostatki")) {
             System.out.println("find header: ostatki");
             resultList = objectMapper.readValue(new BufferedReader(is)
                     .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Ostatki>>(){});
+                    .collect(Collectors.joining("\n")), new TypeReference<List<Ostatki>>() {
+            });
             declarationService.sendOstatki(resultList);
-
         } else if (clazz.equals("sales")) { //--------------------
             System.out.println("find header: sales");
             resultList = objectMapper.readValue(new BufferedReader(is)
                     .lines()
-                    .collect(Collectors.joining("\n")), new TypeReference<List<Sales>>(){});
+                    .collect(Collectors.joining("\n")), new TypeReference<List<Sales>>() {
+            });
             declarationService.sendSales(resultList);
-
-
-
         } else {
             System.out.println("not found header :(");
             return new ResponseEntity<>("404 NOT FOUND",
                     getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
         }
-
 
         SQLConnectService.connectionClose();
         System.out.println(result);
