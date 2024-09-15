@@ -2,6 +2,7 @@ package ek.declaration;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import ek.declaration.handler.HandlerJSON;
 import ek.declaration.model.*;
@@ -37,41 +38,40 @@ public class Endpoint extends HandlerJSON {
         System.out.println("Declareate Beer Service Start");
         server.createContext("/api/beer_decalration", (exchange -> {
             // проверка на POST
-            if ("POST".equals(exchange.getRequestMethod())) {
-                byte[] response;
-
-                String method = exchange.getRequestHeaders().get("method").get(0);
-                String user = exchange.getRequestHeaders().get("user").get(0);
-                String pass = exchange.getRequestHeaders().get("pass").get(0);
-                String url = exchange.getRequestHeaders().get("url").get(0);
-                String database = exchange.getRequestHeaders().get("database").get(0);
-//              String debug = exchange.getRequestHeaders().get("debug").get(0);
-
-                try {
-                    Statement statement = SQLConnectService.getConnect(user, pass, url, database);
-                    declarationService = new DeclarationService(statement);
-                    System.out.println("doPost starting");
-                    responseEntity = doPost(new InputStreamReader(exchange.getRequestBody(), "utf-8"), method);
-
-
-                } catch (SQLException e) {
-                    responseEntity = new ResponseEntity<>("SQLException",
-                            getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
-                    throw new RuntimeException(e);
-                }
-
-                OutputStream os = exchange.getResponseBody();
-
-                exchange.getResponseHeaders().putAll(responseEntity.getHeaders());
-                exchange.sendResponseHeaders(responseEntity.getStatusCode().getCode(), 0);
-                response = super.writeResponse(responseEntity.getBody());
-                os.write(response);
-                os.flush();
-                os.close();
-
-            } else {
+            if (!"POST".equals(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(405, -1);// 405 Method Not Allowed
+                exchange.close();
+                return;
             }
+
+            byte[] response;
+            Headers requestHeaders = exchange.getRequestHeaders();
+            String method = requestHeaders.get("method").get(0);
+            String user = requestHeaders.get("user").get(0);
+            String pass = requestHeaders.get("pass").get(0);
+            String url = requestHeaders.get("url").get(0);
+            String database = requestHeaders.get("database").get(0);
+//          String debug = exchange.getRequestHeaders().get("debug").get(0);
+
+            try {
+                Statement statement = SQLConnectService.getConnect(user, pass, url, database);
+                declarationService = new DeclarationService(statement);
+                System.out.println("doPost starting");
+                responseEntity = doPost(new InputStreamReader(exchange.getRequestBody(), "utf-8"), method);
+            } catch (SQLException e) {
+                responseEntity = new ResponseEntity<>("SQLException",
+                        getHeaders(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON), StatusCode.NOT_FOUND);
+                throw new RuntimeException(e);
+            }
+
+            OutputStream os = exchange.getResponseBody();
+
+            exchange.getResponseHeaders().putAll(responseEntity.getHeaders());
+            exchange.sendResponseHeaders(responseEntity.getStatusCode().getCode(), 0);
+            response = super.writeResponse(responseEntity.getBody());
+            os.write(response);
+            os.flush();
+            os.close();
             exchange.close();
         }));
         server.setExecutor(null); // creates a default executor
